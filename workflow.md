@@ -1,5 +1,5 @@
 # OSCC Whole Exome Sequencing Analysis Pipeline
-Author: [Your Name]
+Author: [MAAZAH MUHAMMAD ALI]
 Project: OSCC – Pakistani Cohort (Khyber Pakhtunkhwa)
 Reference Build: GRCh38 (Ensembl primary assembly)
 Platform: Ubuntu 22.04
