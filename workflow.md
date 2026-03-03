@@ -169,22 +169,104 @@ Output: CSV for downstream analysis in R
 
 # 10. Gene Targets for Analysis
 
-## WNT Pathway Genes
-- CTNNB1 (β-catenin)
-- CDH1 (E-cadherin)
-- MYC
-- APC
-- AXIN1
-- AXIN2
-- LRP5
-- LRP6
-- FZD family
-- DVL1–3
-- GSK3B
 
-## Tumour Suppressor
-- TP53
+## Final Curated Gene Panel
 
+1️⃣  WNT / β-Catenin Axis Canonical WNT Signalling
+
+CTNNB1
+
+APC
+
+AXIN1
+
+AXIN2
+
+GSK3B
+
+TCF7L2
+
+### WNT Ligands & Receptors
+
+WNT1
+
+WNT3A
+
+WNT5A
+
+FZD1
+
+FZD7
+
+LRP6
+
+### Downstream Targets / Proliferation
+
+MYC
+
+CCND1
+
+Adhesion Crosstalk
+
+CDH1
+
+2️⃣ Core OSCC / HNSCC Driver Genes
+
+TP53
+
+NOTCH1
+
+PIK3CA
+
+FAT1
+
+CDKN2A
+
+HRAS
+
+EGFR
+
+CASP8
+
+- Note: These are frequently altered in head & neck cancers.
+
+3️⃣ DNA Damage / Genome Stability (For TMB Context)
+
+- Important for tobacco-associated cancers.
+
+ATM
+
+ATR
+
+BRCA1
+
+BRCA2
+
+CHEK2
+
+4️⃣ PI3K/AKT/mTOR Pathway
+
+Commonly altered in OSCC.
+
+PIK3CA
+
+PTEN
+
+AKT1
+
+MTOR
+
+5️⃣ Additional High-Relevance OSCC Genes
+
+FBXW7
+
+NFE2L2
+
+KEAP1
+
+SMAD4
+
+TGFBR2
 ---
 
 # 11. Comparative Genomics
@@ -216,7 +298,7 @@ Note: Small sample size → exploratory only
 # 13. Reproducibility Notes
 
 - Ubuntu 22.04
-- BWA
+- BWA 
 - Samtools
 - Picard
 - GATK
@@ -228,6 +310,13 @@ Note: Small sample size → exploratory only
 
 All scripts version-controlled via Git.
 
+## Exact Software Versions
+
+BWA v0.7.17-r1188
+samtools v1.13
+Picard v3.4.0
+Java version 21.0.10
+Linux OS: Ubuntu 22.04 LTS
 ---
 
 # 14. Publication Goal
