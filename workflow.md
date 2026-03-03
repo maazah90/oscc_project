@@ -25,21 +25,23 @@ oscc_project/
 
 # 2. Data Download (SRA → FASTQ)
 
-## Download SRA
-
+## Download SRA 
+wget or prefetch SRRXXXXXXX.sra
 
 ## Convert to FASTQ
 fasterq-dump SRRXXXXXXX.sra --split-files --threads 3 --outdir fastq/
 gzip fastq/SRRXXXXXXX_*.fastq
 
+## Download FASTQ directly
 
+- Attempted to downloaded SRA and its dependencies from SRA NCBI but it kept failing. 
+- Opted to download FastQ files from ENA which downloaded. The conversion to FastQ step was skipped over
 ---
 
 # 3. Quality Control
 
 ## FastQC
 fastqc fastq/*.fastq.gz -o qc/
-
 
 ## MultiQC
 multiqc qc/
@@ -59,12 +61,10 @@ wget ftp://ftp.ensembl.org/pub/release-110/fasta/homo_sapiens/dna/Homo_sapiens.G
 gunzip Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
 mv Homo_sapiens.GRCh38.dna.primary_assembly.fa GRCh38.fa
 
-
 ## Indexing
 bwa index GRCh38.fa
 samtools faidx GRCh38.fa
 picard CreateSequenceDictionary R=GRCh38.fa O=GRCh38.dict
-
 
 ---
 
@@ -92,10 +92,8 @@ samtools index ${SAMPLE}.dedup.bam
 
 cat samples.txt | parallel -j 5 bash align_wes.sh {}
 
-
 System RAM: ~20GB  
 Parallel jobs: 5 max
-
 ---
 
 # 6. Base Quality Score Recalibration (BQSR)
@@ -112,6 +110,26 @@ gatk BaseRecalibrator
 --known-sites Mills_and_1000G_gold_standard.indels.hg38.vcf.gz
 -O ${SAMPLE}.recal.table
 
+mkdir -p recal
+
+for bam in aligned/markdup/*.markdup.bam
+do
+    base=$(basename $bam .markdup.bam)
+
+    gatk BaseRecalibrator \
+    -R reference/GRCh38.fa \
+    -I $bam \
+    --known-sites reference/dbsnp.vcf.gz \
+    -O recal/${base}.recal.table
+
+    gatk ApplyBQSR \
+    -R reference/GRCh38.fa \
+    -I $bam \
+    --bqsr-recal-file recal/${base}.recal.table \
+    -O recal/${base}.recal.bam
+
+    samtools index recal/${base}.recal.bam
+done
 
 ## ApplyBQSR
 gatk ApplyBQSR
@@ -119,8 +137,6 @@ gatk ApplyBQSR
 -I ${SAMPLE}.dedup.bam
 --bqsr-recal-file ${SAMPLE}.recal.table
 -O ${SAMPLE}.recal.bam
-
-
 ---
 
 # 7. Somatic Variant Calling (Tumour-Only Mode)
@@ -133,12 +149,24 @@ gatk Mutect2
 --germline-resource gnomad.hg38.vcf.gz
 -O ${SAMPLE}.unfiltered.vcf.gz
 
+mkdir -p variants/raw
+
+for bam in recal/*.recal.bam
+do
+    base=$(basename $bam .recal.bam)
+
+    gatk Mutect2 \
+    -R reference/GRCh38.fa \
+    -I $bam \
+    --germline-resource reference/gnomad.vcf.gz \
+    -L reference/Agilent_V7_targets.bed \
+    -O variants/raw/${base}.unfiltered.vcf.gz
+done
+
 ## Filter Calls
 gatk FilterMutectCalls
 -V ${SAMPLE}.unfiltered.vcf.gz
 -O ${SAMPLE}.filtered.vcf.gz
-
-
 ---
 
 # 8. Variant Filtering Criteria
@@ -147,6 +175,18 @@ Minimum thresholds:
 - Depth (DP) ≥ 20
 - Genotype Quality (GQ) ≥ 20
 - Quality Score (QUAL) ≥ 50
+
+mkdir -p variants/filtered
+
+for vcf in variants/raw/*.unfiltered.vcf.gz
+do
+    base=$(basename $vcf .unfiltered.vcf.gz)
+
+    gatk FilterMutectCalls \
+    -R reference/GRCh38.fa \
+    -V $vcf \
+    -O variants/filtered/${base}.filtered.vcf.gz
+done
 
 ---
 
@@ -162,13 +202,33 @@ table_annovar.pl sample.vcf humandb/
 -nastring .
 -csvout
 
+mkdir -p annotated
+
+for vcf in variants/filtered/*.filtered.vcf.gz
+do
+    base=$(basename $vcf .filtered.vcf.gz)
+
+    vep \
+    -i $vcf \
+    -o annotated/${base}.vep.vcf \
+    --cache \
+    --assembly GRCh38 \
+    --vcf \
+    --symbol \
+    --canonical \
+    --protein \
+    --af
+done
 
 Output: CSV for downstream analysis in R
 
+## Merge all Samples
+
+bcftools merge variants/filtered/*.vcf.gz -Oz -o variants/cohort_merged.vcf.gz
+bcftools index variants/cohort_merged.vcf.gz
 ---
 
 # 10. Gene Targets for Analysis
-
 
 ## Final Curated Gene Panel
 
@@ -272,14 +332,18 @@ TGFBR2
 # 11. Comparative Genomics
 
 Potential comparisons:
-- 1000 Genomes Punjabi (Lahore, Pakistan)
-- European OSCC datasets
+- 1000 Genomes Punjabi (Lahore, Pakistan) from the 1000 Genomes Project
+- European OSCC datasets from The Cancer Genome Atlas or COSMIC
 - gnomAD population frequencies
 
 Objectives:
 - Identify population-enriched SNPs
 - Compare somatic mutation profiles
 - Evaluate mutational burden differences
+
+## Compute allelic Frequency
+bcftools isec -p comparative/pjl_overlap \
+variants/cohort_merged.vcf.gz pjl.vcf.gz
 
 ---
 
