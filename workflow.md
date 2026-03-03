@@ -1,0 +1,243 @@
+# OSCC Whole Exome Sequencing Analysis Pipeline
+Author: [Your Name]
+Project: OSCC – Pakistani Cohort (Khyber Pakhtunkhwa)
+Reference Build: GRCh38 (Ensembl primary assembly)
+Platform: Ubuntu 22.04
+Sequencing: Illumina WES
+Samples: 40 tumour samples (paired-end FASTQ)
+
+---
+
+# 1. Project Structure
+
+oscc_project/
+│
+├── fastq/               # Raw FASTQ files (.fastq.gz)
+├── sra/                 # Downloaded SRA files
+├── reference/           # GRCh38 reference genome
+├── aligned/             # BAM files (sorted, deduplicated)
+├── variants/            # VCF files
+├── tmp/                 # Temporary files
+├── logs/                # Log files
+└── workflow.md          # This file
+
+---
+
+# 2. Data Download (SRA → FASTQ)
+
+## Download SRA
+
+
+## Convert to FASTQ
+fasterq-dump SRRXXXXXXX.sra --split-files --threads 3 --outdir fastq/
+gzip fastq/SRRXXXXXXX_*.fastq
+
+
+---
+
+# 3. Quality Control
+
+## FastQC
+fastqc fastq/*.fastq.gz -o qc/
+
+
+## MultiQC
+multiqc qc/
+
+### Decision:
+- Per-base quality: PASS
+- Adapter content: minimal
+- No trimming performed
+
+---
+
+# 4. Reference Genome Setup
+
+## Download GRCh38 (Ensembl)
+
+wget ftp://ftp.ensembl.org/pub/release-110/fasta/homo_sapiens/dna/Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
+gunzip Homo_sapiens.GRCh38.dna.primary_assembly.fa.gz
+mv Homo_sapiens.GRCh38.dna.primary_assembly.fa GRCh38.fa
+
+
+## Indexing
+bwa index GRCh38.fa
+samtools faidx GRCh38.fa
+picard CreateSequenceDictionary R=GRCh38.fa O=GRCh38.dict
+
+
+---
+
+# 5. Alignment (BWA MEM)
+
+## Script: align_wes.sh
+
+bwa mem -t 4 -R "@RG\tID:${SAMPLE}\tSM:${SAMPLE}\tPL:ILLUMINA"
+GRCh38.fa
+${SAMPLE}_1.fastq.gz
+${SAMPLE}_2.fastq.gz
+| samtools view -bS - > ${SAMPLE}.bam
+
+samtools sort -@ 4 -o ${SAMPLE}.sorted.bam ${SAMPLE}.bam
+
+picard MarkDuplicates
+I=${SAMPLE}.sorted.bam
+O=${SAMPLE}.dedup.bam
+M=${SAMPLE}.metrics.txt
+
+samtools index ${SAMPLE}.dedup.bam
+
+
+## Parallel Execution (5 at a time)
+
+cat samples.txt | parallel -j 5 bash align_wes.sh {}
+
+
+System RAM: ~20GB  
+Parallel jobs: 5 max
+
+---
+
+# 6. Base Quality Score Recalibration (BQSR)
+
+Required resources:
+- dbSNP (hg38)
+- Mills and 1000G indels (hg38)
+
+## BaseRecalibrator
+gatk BaseRecalibrator
+-R GRCh38.fa
+-I ${SAMPLE}.dedup.bam
+--known-sites dbsnp.vcf.gz
+--known-sites Mills_and_1000G_gold_standard.indels.hg38.vcf.gz
+-O ${SAMPLE}.recal.table
+
+
+## ApplyBQSR
+gatk ApplyBQSR
+-R GRCh38.fa
+-I ${SAMPLE}.dedup.bam
+--bqsr-recal-file ${SAMPLE}.recal.table
+-O ${SAMPLE}.recal.bam
+
+
+---
+
+# 7. Somatic Variant Calling (Tumour-Only Mode)
+
+## Mutect2
+gatk Mutect2
+-R GRCh38.fa
+-I ${SAMPLE}.recal.bam
+-tumor ${SAMPLE}
+--germline-resource gnomad.hg38.vcf.gz
+-O ${SAMPLE}.unfiltered.vcf.gz
+
+## Filter Calls
+gatk FilterMutectCalls
+-V ${SAMPLE}.unfiltered.vcf.gz
+-O ${SAMPLE}.filtered.vcf.gz
+
+
+---
+
+# 8. Variant Filtering Criteria
+
+Minimum thresholds:
+- Depth (DP) ≥ 20
+- Genotype Quality (GQ) ≥ 20
+- Quality Score (QUAL) ≥ 50
+
+---
+
+# 9. Annotation
+
+Tool: ANNOVAR
+table_annovar.pl sample.vcf humandb/
+-buildver hg38
+-out sample
+-remove
+-protocol refGene,clinvar_20220320,gnomad30_genome
+-operation g,f,f
+-nastring .
+-csvout
+
+
+Output: CSV for downstream analysis in R
+
+---
+
+# 10. Gene Targets for Analysis
+
+## WNT Pathway Genes
+- CTNNB1 (β-catenin)
+- CDH1 (E-cadherin)
+- MYC
+- APC
+- AXIN1
+- AXIN2
+- LRP5
+- LRP6
+- FZD family
+- DVL1–3
+- GSK3B
+
+## Tumour Suppressor
+- TP53
+
+---
+
+# 11. Comparative Genomics
+
+Potential comparisons:
+- 1000 Genomes Punjabi (Lahore, Pakistan)
+- European OSCC datasets
+- gnomAD population frequencies
+
+Objectives:
+- Identify population-enriched SNPs
+- Compare somatic mutation profiles
+- Evaluate mutational burden differences
+
+---
+
+# 12. Machine Learning (Exploratory)
+
+Planned analyses:
+- PCA on mutation matrix
+- Logistic regression (mutation presence vs group)
+- Mutation burden clustering
+- Pathway enrichment modeling
+
+Note: Small sample size → exploratory only
+
+---
+
+# 13. Reproducibility Notes
+
+- Ubuntu 22.04
+- BWA
+- Samtools
+- Picard
+- GATK
+- GNU Parallel
+- FastQC
+- MultiQC
+- ANNOVAR
+- R / Python (ML phase)
+
+All scripts version-controlled via Git.
+
+---
+
+# 14. Publication Goal
+
+Objective:
+Population-aware somatic mutation profiling of OSCC in Pakistani cohort with WNT pathway focus.
+
+Future expansion:
+- Integrate normal controls
+- Compare to global OSCC datasets
+- Functional pathway enrichment
+- Exploratory ML modeling
+
