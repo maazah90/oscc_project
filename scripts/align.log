@@ -1,0 +1,3 @@
+Seq	Host	Starttime	JobRuntime	Send	Receive	Exitval	Signal	Command
+2	:	1772612713.648	 17652.908	0	274	0	0	./align_wes.sh SRR31443520 2
+1	:	1772612713.639	 24884.641	0	274	0	0	./align_wes.sh SRR31443519 2
