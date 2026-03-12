@@ -198,7 +198,54 @@ Possible analyses include:
 
 ---
 
-# 7. Cohort Comparison
+# 7. Cohort-Level Mutation Analysis
+
+After variant annotation and filtering, cohort-level mutation analysis will be performed using **maftools** in **R**.
+
+Annotated variants will be converted into Mutation Annotation Format (MAF) files, which are commonly used for cancer genomics studies.
+
+This analysis enables visualization and statistical exploration of somatic mutation patterns across the cohort.
+
+### Analyses performed with maftools
+
+Possible analyses include:
+
+* Mutation frequency analysis
+* Gene mutation summaries
+* Mutation spectrum analysis
+* Tumour mutation burden estimation
+* Cohort visualization
+
+### Common visualizations
+
+Typical visualizations generated using maftools include:
+
+* Oncoplots (mutation landscape across samples)
+* Mutation frequency barplots
+* Variant classification summaries
+* Gene mutation heatmaps
+
+These analyses help identify recurrently mutated genes and characterize the overall mutation profile of the cohort.
+
+### Example OSCC driver genes examined
+
+Frequently mutated genes in **Oral Squamous Cell Carcinoma** and related to my work on the **Wnt-Beta Catenin pathway**:
+
+* TP53
+* NOTCH1
+* FAT1
+* PIK3CA
+* CDKN2A
+* B-Catenin
+* E-Cadherin
+* c-MYC
+* Cyclin D1
+
+Mutation patterns observed in the cohort will be compared with public datasets such as **TCGA Head and Neck Squamous Cell Carcinoma (TCGA-HNSC)** and **COSMIC**.
+
+
+
+# 8. Cohort Comparison
 
 Mutation profiles may be compared with publicly available cancer datasets including:
 
@@ -213,7 +260,7 @@ Comparisons may examine:
 
 ---
 
-# 8. Population-Level Analysis (Optional)
+# 9. Population-Level Analysis (Optional)
 
 To explore potential population-specific genomic variation, the cohort may be compared with global population datasets including the **1000 Genomes Project**.
 
