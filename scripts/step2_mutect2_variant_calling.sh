@@ -12,164 +12,139 @@ GNOMAD=$PROJECT_DIR/resources/af-only-gnomad.vcf.gz
 GNOMAD_COMMON=$PROJECT_DIR/resources/gnomad_common.vcf.gz
 INTERVALS=$PROJECT_DIR/intervals/exome_targets.bed
 
-
 RESULTS=$PROJECT_DIR/results
 LOGS=$PROJECT_DIR/logs
 
+# Create results/logs folders if they don't exist
 mkdir -p $RESULTS/mutect2
-mkdir -p $RESULTS/pon_db
 mkdir -p $LOGS
+mkdir -p $RESULTS/tmp
 
 ################################
-# CREATE PANEL OF NORMALS
+# FORCE ALL TEMP FILES TO EXTERNAL DRIVE
 ################################
 
-if [ ! -f "$RESULTS/pon.vcf.gz" ]; then
+export TMPDIR=$RESULTS/tmp
+export _JAVA_OPTIONS="-Djava.io.tmpdir=$TMPDIR"
 
-echo "===================================="
-echo "Creating Panel of Normals"
-echo "===================================="
-
-# Remove old database if it exists
-rm -rf "$RESULTS/pon_db"
-
-PON_FILES=$(ls $RESULTS/pon/*.vcf.gz)
-
-gatk --java-options "-Xmx8G" GenomicsDBImport \
-    --genomicsdb-workspace-path $RESULTS/pon_db \
-    -L $INTERVALS \
-    --reader-threads 4 \
-    $(for f in $PON_FILES; do echo -V $f; done)
-
-
-gatk --java-options "-Xmx6G" CreateSomaticPanelOfNormals \
-    -R $REF \
-    -V gendb://$RESULTS/pon_db \
-    -O $RESULTS/pon.vcf.gz
-
-gatk IndexFeatureFile \
-    -I $RESULTS/pon.vcf.gz
-
-echo "PoN created"
-
-fi
+echo "GATK temporary folder set to: $TMPDIR"
 
 ################################
-# SAMPLE LIST
+# SAMPLE LIST & BATCH SETUP
 ################################
 
 SAMPLES=($(cat $PROJECT_DIR/samples.txt))
 TOTAL=${#SAMPLES[@]}
-BATCH=4
+BATCH=2   # adjusted for 4 cores / 20GB RAM
 
 ################################
-# MUTECT2 LOOP
+# MUTECT2 LOOP (Tumor-only)
 ################################
 
-for ((i=0;i<$TOTAL;i+=BATCH))
-do
+for ((i=0;i<$TOTAL;i+=BATCH)); do
 
-echo "===================================="
-echo "Running batch ${SAMPLES[@]:i:BATCH}"
-echo "===================================="
+    echo "===================================="
+    echo "Running batch ${SAMPLES[@]:i:BATCH}"
+    echo "===================================="
 
-for SAMPLE in "${SAMPLES[@]:i:BATCH}"
-do
+    for SAMPLE in "${SAMPLES[@]:i:BATCH}"; do
 
-FINAL_VCF=$RESULTS/mutect2/${SAMPLE}_filtered.vcf.gz
+        FINAL_VCF=$RESULTS/mutect2/${SAMPLE}_filtered.vcf.gz
 
-if [ -f "$FINAL_VCF" ]; then
-    echo "$SAMPLE already complete → skipping"
-    continue
-fi
+        if [ -f "$FINAL_VCF" ]; then
+            echo "$SAMPLE already complete → skipping"
+            continue
+        fi
 
-RECAL_BAM=$RESULTS/recal/${SAMPLE}_recal.bam
+        RECAL_BAM=$RESULTS/recal/${SAMPLE}_recal.bam
 
-if [ ! -f "$RECAL_BAM" ]; then
-    echo "ERROR: $RECAL_BAM not found, skipping $SAMPLE"
-    continue
-fi
+        if [ ! -f "$RECAL_BAM" ]; then
+            echo "ERROR: $RECAL_BAM not found, skipping $SAMPLE"
+            continue
+        fi
 
-UNFILTERED=$RESULTS/mutect2/${SAMPLE}_unfiltered.vcf.gz
-TMP_VCF=$RESULTS/mutect2/${SAMPLE}_unfiltered.vcf.gz.tmp
+        UNFILTERED=$RESULTS/mutect2/${SAMPLE}_unfiltered.vcf.gz
+        TMP_VCF=$RESULTS/mutect2/${SAMPLE}_unfiltered.vcf.gz.tmp
+        F1R2=$RESULTS/mutect2/${SAMPLE}_f1r2.tar.gz
+        PRIORS=$RESULTS/mutect2/${SAMPLE}_artifact-priors.tar.gz
+        PILEUP=$RESULTS/mutect2/${SAMPLE}_pileups.table
+        CONTAM=$RESULTS/mutect2/${SAMPLE}_contamination.table
 
-F1R2=$RESULTS/mutect2/${SAMPLE}_f1r2.tar.gz
-PRIORS=$RESULTS/mutect2/${SAMPLE}_artifact-priors.tar.gz
+        echo "Running Mutect2 (tumor-only) for $SAMPLE"
 
-echo "Running Mutect2 for $SAMPLE"
+        ################################
+        # Mutect2 (tumor-only)
+        ################################
 
-################################
-# Mutect2
-################################
+        gatk --java-options "-Xmx4G" Mutect2 \
+            -R $REF \
+            -I $RECAL_BAM \
+            -L $INTERVALS \
+            -tumor $SAMPLE \
+            --germline-resource $GNOMAD \
+            --f1r2-tar-gz $F1R2 \
+            -O $TMP_VCF \
+            2> $LOGS/${SAMPLE}_mutect2.log
 
-gatk --java-options "-Xmx4G" Mutect2 \
-    -R $REF \
-    -I $RECAL_BAM \
-    -L $INTERVALS \
-    -tumor $SAMPLE \
-    --panel-of-normals $RESULTS/pon.vcf.gz \
-    --germline-resource $GNOMAD \
-    --f1r2-tar-gz $F1R2 \
-    -O $TMP_VCF \
-    2> $LOGS/${SAMPLE}_mutect2.log
+        if [ $? -eq 0 ]; then
+            mv $TMP_VCF $UNFILTERED
+        else
+            echo "Mutect2 failed for $SAMPLE"
+            rm -f $TMP_VCF
+            continue
+        fi
 
+        ################################
+        # Learn orientation artifacts
+        ################################
 
-if [ $? -eq 0 ]; then
-    mv $TMP_VCF $UNFILTERED
-else
-    echo "Mutect2 failed for $SAMPLE"
-    rm -f $TMP_VCF
-    continue
-fi
+        gatk --java-options "-Xmx4G" LearnReadOrientationModel \
+            -I $F1R2 \
+            -O $PRIORS
 
-################################
-# Learn orientation artifacts
-################################
+        ################################
+        # Contamination estimation
+        ################################
+        
+        gatk --java-options "-Xmx4G" GetPileupSummaries \
+            -I $RECAL_BAM \
+            -V $GNOMAD_COMMON \
+            -L $INTERVALS \
+            -O $PILEUP
 
-gatk --java-options "-Xmx4G" LearnReadOrientationModel \
-    -I $F1R2 \
-    -O $PRIORS
+        gatk --java-options "-Xmx4G" CalculateContamination \
+            -I $PILEUP \
+            -O $CONTAM
 
-################################
-# Contamination estimation
-################################
-    
-gatk --java-options "-Xmx4G" GetPileupSummaries \
-    -I $RECAL_BAM \
-    -V $GNOMAD_COMMON \
-    -L $INTERVALS \
-    -O $RESULTS/mutect2/${SAMPLE}_pileups.table
+        ################################
+        # Variant filtering
+        ################################
 
+        gatk --java-options "-Xmx4G" FilterMutectCalls \
+            -R $REF \
+            -V $UNFILTERED \
+            --contamination-table $CONTAM \
+            --ob-priors $PRIORS \
+            -O $FINAL_VCF
 
-gatk --java-options "-Xmx4G" CalculateContamination \
-    -I $RESULTS/mutect2/${SAMPLE}_pileups.table \
-    -O $RESULTS/mutect2/${SAMPLE}_contamination.table
+        if [ $? -ne 0 ]; then
+            echo "Filtering failed for $SAMPLE"
+            continue
+        fi
 
-################################
-# Variant filtering
-################################
+        ################################
+        # CLEANUP TEMP FILES
+        ################################
+        rm -f $F1R2 $PRIORS $PILEUP $CONTAM
+        echo "Temporary files for $SAMPLE removed"
 
-gatk --java-options "-Xmx4G" FilterMutectCalls \
-    -R $REF \
-    -V $UNFILTERED \
-    --contamination-table $RESULTS/mutect2/${SAMPLE}_contamination.table \
-    --ob-priors $PRIORS \
-    -O $FINAL_VCF
+        echo "$SAMPLE finished"
 
-if [ $? -ne 0 ]; then
-    echo "Filtering failed for $SAMPLE"
-    continue
-fi
+    done
 
-
-echo "$SAMPLE finished"
-
-done
-
-echo ""
-read -p "Batch finished. Press ENTER for next batch..."
+    echo ""
+    read -p "Batch finished. Press ENTER for next batch..."
 
 done
 
 echo "Pipeline finished"
-
