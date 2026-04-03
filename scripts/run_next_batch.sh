@@ -1,22 +1,58 @@
 #!/bin/bash
 
-BATCH_SIZE=2
+THREADS=2
+JOBS=2
 
-head -n $BATCH_SIZE remaining.txt > current_batch.txt
+BASE="/media/maazah/Expansion/oscc_project"
+LOGDIR="$BASE/results/logs_trimmed"
 
-if [ ! -s current_batch.txt ]; then
-    echo "No more samples to process."
-    exit 0
+mkdir -p "$LOGDIR"
+
+if [ ! -f samples.txt ]; then
+    echo "samples.txt not found"
+    exit 1
 fi
 
-echo "Running next batch:"
-cat current_batch.txt
-echo "-------------------------"
+TOTAL=$(wc -l < samples.txt)
+START=1
 
-parallel -j 2 './align_wes.sh {1} 2' :::: current_batch.txt
+while [ $START -le $TOTAL ]; do
 
-# If successful, remove completed samples
-tail -n +$(($BATCH_SIZE + 1)) remaining.txt > tmp.txt
-mv tmp.txt remaining.txt
+    echo "========================================="
+    echo "Processing samples $START to $((START + JOBS - 1))"
+    echo "========================================="
 
-echo "Batch complete."
+    # Extract current batch
+    sed -n "${START},$((START + JOBS - 1))p" samples.txt > current_batch.txt
+
+    if [ ! -s current_batch.txt ]; then
+        echo "No more samples to process."
+        break
+    fi
+
+    cat current_batch.txt
+    echo "-----------------------------------------"
+
+    parallel -j "$JOBS" --joblog "$LOGDIR/parallel_joblog.txt" \
+    'echo "Starting {1} at $(date)";
+     bash align_wes.sh {1} '"$THREADS"' > '"$LOGDIR"'/{1}.log 2>&1;
+     echo "Finished {1} at $(date)"' \
+    :::: current_batch.txt
+
+    echo "-----------------------------------------"
+    echo "Batch finished."
+
+    # Ask for confirmation
+    read -p "Run next batch? (y/n): " choice
+
+    if [[ "$choice" != "y" ]]; then
+        echo "Stopping pipeline."
+        break
+    fi
+
+    START=$((START + JOBS))
+
+done
+
+echo "========================================="
+echo "Pipeline ended."
