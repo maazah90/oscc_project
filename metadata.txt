@@ -1,0 +1,25 @@
+run_accession	sample_accession	experiment_accession	library_strategy	library_source	study_title	sample_title
+ERR1429984	SAMEA4019127	ERX1500362	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 11
+ERR1429986	SAMEA4019129	ERX1500364	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 13
+ERR1429992	SAMEA4019135	ERX1500370	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 19
+ERR1429995	SAMEA4019138	ERX1500373	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 21
+ERR1429983	SAMEA4019126	ERX1500361	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 10
+ERR1429985	SAMEA4019128	ERX1500363	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 12
+ERR1429987	SAMEA4019130	ERX1500365	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 14
+ERR1429988	SAMEA4019131	ERX1500366	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 15
+ERR1429990	SAMEA4019133	ERX1500368	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 17
+ERR1429993	SAMEA4019136	ERX1500371	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 2
+ERR1429996	SAMEA4019139	ERX1500374	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 22
+ERR1429999	SAMEA4019142	ERX1500377	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 3
+ERR1430002	SAMEA4019145	ERX1500380	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 6
+ERR1430003	SAMEA4019146	ERX1500381	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 7
+ERR1429982	SAMEA4019125	ERX1500360	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 1
+ERR1429989	SAMEA4019132	ERX1500367	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 16
+ERR1429991	SAMEA4019134	ERX1500369	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 18
+ERR1429994	SAMEA4019137	ERX1500372	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 20
+ERR1429997	SAMEA4019140	ERX1500375	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 23
+ERR1429998	SAMEA4019141	ERX1500376	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 24
+ERR1430000	SAMEA4019143	ERX1500378	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 4
+ERR1430001	SAMEA4019144	ERX1500379	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 5
+ERR1430004	SAMEA4019147	ERX1500382	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 8
+ERR1430005	SAMEA4019148	ERX1500383	WXS	GENOMIC	Whole exome sequencing of TSCC (tongue squamous cell carcinoma)	Sample 9
