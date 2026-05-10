@@ -14,11 +14,11 @@ BASE="/media/maazah/Expansion/oscc_project"
 REF="$BASE/reference/GRCh38.fa"
 PICARD="$BASE/reference/picard.jar"
 
-FASTQ1="$BASE/trimmed_fastq/${SAMPLE}_1_paired.fastq.gz"
-FASTQ2="$BASE/trimmed_fastq/${SAMPLE}_2_paired.fastq.gz"
+FASTQ1="$BASE/trimmed_indian_study_samples/${SAMPLE}_R1_paired.fastq.gz"
+FASTQ2="$BASE/trimmed_indian_study_samples/${SAMPLE}_R2_paired.fastq.gz"
 
-OUTDIR="$BASE/bam"
-LOGDIR="$BASE/logs_trimmed"   # 👈 updated log folder
+OUTDIR="$BASE/bam_indian_samples"
+LOGDIR="$BASE/logs_bam_indian_samples"   # 👈 updated log folder
 mkdir -p "$OUTDIR"
 mkdir -p "$LOGDIR"
 
