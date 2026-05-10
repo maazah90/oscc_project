@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -e
+set -o pipefail
+
 ################################
 # PROJECT PATH SETUP
 ################################
@@ -7,143 +10,163 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PROJECT_DIR=$(dirname "$SCRIPT_DIR")
 
-REF=$PROJECT_DIR/reference/GRCh38.fa
-GNOMAD=$PROJECT_DIR/resources/af-only-gnomad.vcf.gz
-GNOMAD_COMMON=$PROJECT_DIR/resources/gnomad_common.vcf.gz
-INTERVALS=$PROJECT_DIR/intervals/exome_targets.bed
+REF="$PROJECT_DIR/reference/GRCh38.fa"
+GNOMAD="$PROJECT_DIR/resources/af-only-gnomad.fixed.vcf.gz"
+GNOMAD_COMMON="$PROJECT_DIR/resources/gnomad_common.fixed.vcf.gz"
+PON="$PROJECT_DIR/resources/1000g_pon.hg38.fixed.vcf.gz"
+INTERVALS="$PROJECT_DIR/intervals/exome_targets.bed"
 
-RESULTS=$PROJECT_DIR/results
-LOGS=$PROJECT_DIR/logs
+RESULTS="$PROJECT_DIR/results/mutect2_trimmed"
+LOGS="$PROJECT_DIR/logs_results"
 
-# Create results/logs folders if they don't exist
-mkdir -p $RESULTS/mutect2
-mkdir -p $LOGS
-mkdir -p $RESULTS/tmp
-
-################################
-# FORCE ALL TEMP FILES TO EXTERNAL DRIVE
-################################
-
-export TMPDIR=$RESULTS/tmp
-export _JAVA_OPTIONS="-Djava.io.tmpdir=$TMPDIR"
-
-echo "GATK temporary folder set to: $TMPDIR"
+mkdir -p "$RESULTS"
+mkdir -p "$RESULTS/tmp"
+mkdir -p "$LOGS"
 
 ################################
 # SAMPLE LIST & BATCH SETUP
 ################################
 
-SAMPLES=($(cat $PROJECT_DIR/samples.txt))
+SAMPLES=($(cat "$PROJECT_DIR/samples.txt"))
 TOTAL=${#SAMPLES[@]}
-BATCH=2   # adjusted for 4 cores / 20GB RAM
+BATCH=2   # 2 samples in parallel
 
 ################################
-# MUTECT2 LOOP (Tumor-only)
+# LOOP OVER BATCHES
 ################################
 
 for ((i=0;i<$TOTAL;i+=BATCH)); do
 
     echo "===================================="
-    echo "Running batch ${SAMPLES[@]:i:BATCH}"
+    echo "Running batch: ${SAMPLES[@]:i:BATCH}"
     echo "===================================="
 
     for SAMPLE in "${SAMPLES[@]:i:BATCH}"; do
+    (
+        echo "------------------------------------"
+        echo "Processing $SAMPLE"
+        echo "------------------------------------"
 
-        FINAL_VCF=$RESULTS/mutect2/${SAMPLE}_filtered.vcf.gz
+        FINAL_VCF="$RESULTS/${SAMPLE}_filtered.vcf.gz"
+        UNFILTERED="$RESULTS/${SAMPLE}_unfiltered.vcf.gz"
+        RECAL_BAM="$PROJECT_DIR/results/recal_trimmed/${SAMPLE}_recal.bam"
 
         if [ -f "$FINAL_VCF" ]; then
             echo "$SAMPLE already complete → skipping"
-            continue
+            exit 0
         fi
-
-        RECAL_BAM=$RESULTS/recal/${SAMPLE}_recal.bam
 
         if [ ! -f "$RECAL_BAM" ]; then
-            echo "ERROR: $RECAL_BAM not found, skipping $SAMPLE"
-            continue
+            echo "ERROR: $RECAL_BAM not found"
+            exit 1
         fi
 
-        UNFILTERED=$RESULTS/mutect2/${SAMPLE}_unfiltered.vcf.gz
-        TMP_VCF=$RESULTS/mutect2/${SAMPLE}_unfiltered.vcf.gz.tmp
-        F1R2=$RESULTS/mutect2/${SAMPLE}_f1r2.tar.gz
-        PRIORS=$RESULTS/mutect2/${SAMPLE}_artifact-priors.tar.gz
-        PILEUP=$RESULTS/mutect2/${SAMPLE}_pileups.table
-        CONTAM=$RESULTS/mutect2/${SAMPLE}_contamination.table
-
-        echo "Running Mutect2 (tumor-only) for $SAMPLE"
-
-        ################################
-        # Mutect2 (tumor-only)
-        ################################
-
-        gatk --java-options "-Xmx4G" Mutect2 \
-            -R $REF \
-            -I $RECAL_BAM \
-            -L $INTERVALS \
-            -tumor $SAMPLE \
-            --germline-resource $GNOMAD \
-            --f1r2-tar-gz $F1R2 \
-            -O $TMP_VCF \
-            2> $LOGS/${SAMPLE}_mutect2.log
-
-        if [ $? -eq 0 ]; then
-            mv $TMP_VCF $UNFILTERED
-        else
-            echo "Mutect2 failed for $SAMPLE"
-            rm -f $TMP_VCF
-            continue
+        if [ ! -f "${RECAL_BAM}.bai" ]; then
+            echo "Indexing BAM for $SAMPLE"
+            samtools index "$RECAL_BAM"
         fi
 
         ################################
-        # Learn orientation artifacts
+        # TMP DIR
         ################################
-
-        gatk --java-options "-Xmx4G" LearnReadOrientationModel \
-            -I $F1R2 \
-            -O $PRIORS
+        TMPDIR_SAMPLE="$RESULTS/tmp/$SAMPLE"
+        mkdir -p "$TMPDIR_SAMPLE"
 
         ################################
-        # Contamination estimation
+        # INTERMEDIATE FILES
         ################################
-        
-        gatk --java-options "-Xmx4G" GetPileupSummaries \
-            -I $RECAL_BAM \
-            -V $GNOMAD_COMMON \
-            -L $INTERVALS \
-            -O $PILEUP
-
-        gatk --java-options "-Xmx4G" CalculateContamination \
-            -I $PILEUP \
-            -O $CONTAM
+        F1R2="$RESULTS/${SAMPLE}_f1r2.tar.gz"
+        PRIORS="$RESULTS/${SAMPLE}_artifact-priors.tar.gz"
+        PILEUP="$RESULTS/${SAMPLE}_pileups.table"
+        CONTAM="$RESULTS/${SAMPLE}_contamination.table"
 
         ################################
-        # Variant filtering
+        # MUTECT2
         ################################
 
-        gatk --java-options "-Xmx4G" FilterMutectCalls \
-            -R $REF \
-            -V $UNFILTERED \
-            --contamination-table $CONTAM \
-            --ob-priors $PRIORS \
-            -O $FINAL_VCF
+        echo "Running Mutect2 for $SAMPLE"
 
-        if [ $? -ne 0 ]; then
-            echo "Filtering failed for $SAMPLE"
-            continue
+        gatk --java-options "-Xmx6G -Djava.io.tmpdir=$TMPDIR_SAMPLE" Mutect2 \
+            -R "$REF" \
+            -I "$RECAL_BAM" \
+            -L "$INTERVALS" \
+            -tumor "$SAMPLE" \
+            --germline-resource "$GNOMAD" \
+            --panel-of-normals "$PON" \
+            --native-pair-hmm-threads 2 \
+            --f1r2-tar-gz "$F1R2" \
+            -O "$UNFILTERED" \
+            2> "$LOGS/${SAMPLE}_mutect2.log"
+
+        ################################
+        # VALIDATION
+        ################################
+
+        if [ ! -f "$UNFILTERED" ] || [ ! -f "${UNFILTERED}.stats" ]; then
+            echo "ERROR: Mutect2 output missing for $SAMPLE"
+            exit 1
         fi
 
         ################################
-        # CLEANUP TEMP FILES
+        # ORIENTATION BIAS
         ################################
-        rm -f $F1R2 $PRIORS $PILEUP $CONTAM
-        echo "Temporary files for $SAMPLE removed"
 
-        echo "$SAMPLE finished"
+        echo "Learning orientation bias for $SAMPLE"
 
+        gatk --java-options "-Xmx6G -Djava.io.tmpdir=$TMPDIR_SAMPLE" LearnReadOrientationModel \
+            -I "$F1R2" \
+            -O "$PRIORS"
+
+        ################################
+        # CONTAMINATION
+        ################################
+
+        echo "Estimating contamination for $SAMPLE"
+
+        gatk --java-options "-Xmx6G -Djava.io.tmpdir=$TMPDIR_SAMPLE" GetPileupSummaries \
+            -I "$RECAL_BAM" \
+            -V "$GNOMAD_COMMON" \
+            -L "$INTERVALS" \
+            -O "$PILEUP"
+
+        gatk --java-options "-Xmx6G -Djava.io.tmpdir=$TMPDIR_SAMPLE" CalculateContamination \
+            -I "$PILEUP" \
+            -O "$CONTAM"
+
+        ################################
+        # FILTERING
+        ################################
+
+        echo "Filtering variants for $SAMPLE"
+
+        gatk --java-options "-Xmx6G -Djava.io.tmpdir=$TMPDIR_SAMPLE" FilterMutectCalls \
+            -R "$REF" \
+            -V "$UNFILTERED" \
+            --stats "${UNFILTERED}.stats" \
+            --contamination-table "$CONTAM" \
+            --ob-priors "$PRIORS" \
+            -O "$FINAL_VCF"
+
+        ################################
+        # INDEX FINAL VCF
+        ################################
+
+        gatk IndexFeatureFile -I "$FINAL_VCF"
+
+        ################################
+        # CLEANUP
+        ################################
+
+        rm -f "$F1R2" "$PRIORS" "$PILEUP" "$CONTAM"
+
+        echo "$SAMPLE finished successfully"
+
+    ) &
     done
 
-    echo ""
-    read -p "Batch finished. Press ENTER for next batch..."
+    wait
+
+    echo "Batch finished. Continuing..."
 
 done
 
