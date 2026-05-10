@@ -1,43 +1,56 @@
 #!/bin/bash
 
-# ============================================
-# 🗂 PATHS
-# ============================================
-VCF_DIR="/media/maazah/Expansion/oscc_project/results/pass_vcfs"       # folder with your pass.vcf files
-ANNOVAR_DIR="/media/maazah/Expansion/oscc_project/annovar/avinput"      # folder to save avinput files
-HUMANDB="/media/maazah/Expansion/oscc_project/annovar/humandb"
+set -euo pipefail
 
-mkdir -p "$ANNOVAR_DIR"
+################################
+# PATHS
+################################
 
-# ============================================
-# 🔁 LOOP THROUGH VCF FILES
-# ============================================
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+PROJECT_DIR=$(dirname "$SCRIPT_DIR")
 
-for vcf in "$VCF_DIR"/*_pass.vcf.gz; do
+VCF_DIR="$PROJECT_DIR/results/pass_vcfs_indian"
+ANNOVAR_BIN="$PROJECT_DIR/annovar"
+OUT_DIR="$PROJECT_DIR/annovar/avinput_indian"
+LOGS="$OUT_DIR/logs"
+
+mkdir -p "$OUT_DIR" "$LOGS"
+
+################################
+# LOOP
+################################
+
+for vcf in "$VCF_DIR"/*.pass.vcf.gz; do
 
     [[ -e "$vcf" ]] || { echo "❌ No VCF files found"; break; }
 
-    sample=$(basename "$vcf" _pass.vcf.gz)
-    avinput="$ANNOVAR_DIR/${sample}.avinput"
+    sample=$(basename "$vcf" .pass.vcf.gz)
+    avinput="$OUT_DIR/${sample}.avinput"
 
-    if [[ -f "$avinput" ]]; then
-        echo "✅ Already done: $sample"
-        continue
-    fi
+    echo "======================================"
+    echo "🔍 Processing: $sample"
 
-    echo "⏳ Converting: $sample"
+    ################################
+    # DIRECT CONVERSION (TUMOR-ONLY SAFE)
+    ################################
+    echo "⏳ Converting to avinput..."
 
-    zcat "$vcf" | perl "$ANNOVAR_DIR/convert2annovar.pl" \
+    zcat "$vcf" | \
+    perl "$ANNOVAR_BIN/convert2annovar.pl" \
         -format vcf4 \
-        -includeinfo \
         - \
-        > "$avinput" 2> "${avinput}.log"
+        > "$avinput" 2> "$LOGS/${sample}.log"
 
-    # Check if output is empty
-    if [[ ! -s "$avinput" ]]; then
-        echo "❌ Failed: $sample (check ${avinput}.log)"
+    ################################
+    # VALIDATION
+    ################################
+    if [[ -s "$avinput" ]]; then
+        echo "✅ Done: $sample ($(wc -l < "$avinput") variants)"
     else
-        echo "✅ Done: $sample"
+        echo "❌ Failed: $sample"
+        echo "   Check log: $LOGS/${sample}.log"
     fi
 
 done
+
+echo "🎉 All samples processed!"
