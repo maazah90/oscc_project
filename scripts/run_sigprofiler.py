@@ -6,8 +6,8 @@ from pathlib import Path
 PLAIN_VCF_DIR = "/media/maazah/Expansion/oscc_project/results/plain_vcfs"
 OUTDIR = "/media/maazah/Expansion/oscc_project/SigProfiler_results_GRCh38_WES"
 MIN_SIG = 1
-MAX_SIG = 8
-NMF_REPLICATES = 50
+MAX_SIG = 3
+NMF_REPLICATES = 100
 EXOME = True
 GENOME_NAME = "GRCh38"
 
