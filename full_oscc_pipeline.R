@@ -1,5 +1,31 @@
 ############################################################
-# 📦 LIBRARIES
+# OSCC Comparative Genomics — Main Analysis Pipeline
+# 
+# Study: Comparative Genomic Analysis Reveals Distinct
+#        Mutational Landscapes and Increased Actionable
+#        Alterations in Pakistani Oral Squamous Cell Carcinoma
+#
+# Author: Maazah Muhammad Ali
+# Institution: Ziauddin University, Karachi, Pakistan
+# Date: 2026
+#
+# Description:
+#   Full pipeline from ANNOVAR output to publication figures.
+#   Includes MAF processing, TCGA comparison, TMB analysis,
+#   mutational signatures, driver gene analysis, Jaccard
+#   similarity, UMAP, lollipop plots, and drug-gene targets.
+#
+# Input:  ANNOVAR multianno.txt files in annovar_detailed/
+# Output: Publication figures in FIGURES_new/
+#
+# Data sources:
+#   Pakistani cohort: PRJNA1189482
+#   TCGA HNSC: GDC portal (MC3 dataset)
+############################################################
+
+
+############################################################
+# LIBRARIES
 ############################################################
 
 library(data.table)
@@ -14,11 +40,11 @@ library(uwot)
 library(patchwork)
 library(TCGAbiolinks)
 
-output_dir <- "FIGURES_new"
+output_dir <- "FIGURES"
 dir.create(output_dir, showWarnings = FALSE)
 
 ############################################################
-# 🎨 PUBLICATION THEME
+# PUBLICATION THEME
 ############################################################
 
 theme_pub <- function(base_size = 14){
@@ -41,7 +67,7 @@ palette_cohort <- c(
 )
 
 ############################################################
-# 🧬 GENE SETS
+# GENE SETS
 ############################################################
 
 ddr_genes  <- toupper(c("ATM","BRCA1","BRCA2","CHEK2","ATR","CHEK1"))
@@ -64,7 +90,7 @@ noise_genes <- toupper(c(
 ))
 
 ############################################################
-# 🧼 HELPER FUNCTIONS
+# HELPER FUNCTIONS
 ############################################################
 
 clean_gene <- function(x){
@@ -81,7 +107,7 @@ safe_col <- function(df, col, default = NA){
 }
 
 ############################################################
-# 🔄 ANNOVAR → MAF
+# ANNOVAR → MAF
 ############################################################
 
 convert_annovar_to_maf <- function(file){
@@ -157,7 +183,7 @@ convert_annovar_to_maf <- function(file){
 }
 
 ############################################################
-# 📁 LOAD + MERGE ANNOVAR FILES
+# LOAD + MERGE ANNOVAR FILES
 ############################################################
 
 files <- list.files("annovar_detailed",
@@ -202,7 +228,7 @@ cat("Pakistani samples (driver):",
 print(getGeneSummary(maf_pk_full)[1:15, ])
 
 ############################################################
-# 🧬 TCGA — LOAD, FILTER, CLEAN
+# TCGA — LOAD, FILTER, CLEAN
 ############################################################
 
 tcga <- tcgaLoad("HNSC", source = "MC3")
@@ -253,7 +279,7 @@ cat("\nTCGA samples (full):",
 print(getGeneSummary(tcga_eur)[1:15, ])
 
 ############################################################
-# 🔗 MERGE
+# MERGE
 ############################################################
 
 maf_combined_df <- data.table::rbindlist(
@@ -320,7 +346,7 @@ ggsave(file.path(output_dir, "Fig_TMB_Final.pdf"),
        p_tmb, width = 6, height = 5)
 
 ############################################################
-# 📊 MUTATION SPECTRUM
+# MUTATION SPECTRUM
 ############################################################
 
 mut_prop <- maf_combined@data %>%
@@ -354,7 +380,7 @@ ggsave(file.path(output_dir, "Fig_MutationSpectrum.pdf"),
        p_mut, width = 6, height = 5)
 
 ############################################################
-# 📊 DRIVER GENE PANEL
+# DRIVER GENE PANEL
 ############################################################
 
 driver_table <- maf_combined@data %>%
@@ -398,7 +424,7 @@ ggsave(file.path(output_dir, "Fig_TMB_Driver_Panel.pdf"),
        p_multi, width = 12, height = 8)
 
 ############################################################
-# 📊 ONCOPLOTS
+# ONCOPLOTS
 ############################################################
 
 top_genes <- getGeneSummary(maf_combined) %>%
@@ -415,7 +441,7 @@ oncoplot(tcga_eur, genes = top_genes, removeNonMutated = FALSE)
 dev.off()
 
 ############################################################
-# 📊 FISHER TEST + VOLCANO + FOREST
+# FISHER TEST + VOLCANO + FOREST
 ############################################################
 
 total_pk   <- length(unique(maf_pk@data$Tumor_Sample_Barcode))
@@ -484,7 +510,7 @@ ggsave(file.path(output_dir, "Fig_Volcano_Forest.pdf"),
        p_volcano + p_forest, width = 12, height = 5)
 
 ############################################################
-# 📊 JACCARD
+# JACCARD
 ############################################################
 
 n_pk   <- length(unique(maf_pk@data$Tumor_Sample_Barcode))
@@ -555,7 +581,7 @@ for(gene in c("TP53","FAT1","NOTCH1","MTOR")){
 }
 
 ############################################################
-# 📊 UMAP
+# UMAP
 ############################################################
 
 mut_mat <- maf_combined@data %>%
@@ -590,7 +616,7 @@ p_umap <- ggplot(umap_df, aes(UMAP1, UMAP2, color = Cohort)) +
 ggsave(file.path(output_dir, "Fig_UMAP.pdf"), p_umap, width = 6.5, height = 5.5)
 
 ############################################################
-# 📊 HIGH-CONFIDENCE FUNCTIONAL VARIANTS
+# HIGH-CONFIDENCE FUNCTIONAL VARIANTS
 ############################################################
 
 high_conf <- maf_combined@data %>%
@@ -620,7 +646,7 @@ ggsave(file.path(output_dir, "Fig_CADD_Distribution.pdf"),
        p_cadd, width = 7, height = 5)
 
 ############################################################
-# 📁 TABLE EXPORTS
+# TABLE EXPORTS
 ############################################################
 
 write.table(getGeneSummary(maf_combined),
@@ -637,7 +663,6 @@ write.table(getSampleSummary(maf_combined) %>%
             sep = "\t", row.names = FALSE)
 
 cat("\nDone. All figures saved to:", output_dir, "\n")
-
 
 # Check raw mutation counts before TMB calculation
 cat("=== RAW MUTATION COUNTS ===\n")
@@ -661,8 +686,6 @@ print(summary(tmb_tcga$total_perMB))
 # Check column names in tmb output
 cat("\nTMB column names:\n")
 print(colnames(tmb_pk))
-
-
 
 # Figure 1 — overall TMB (all genes, noise filtered only)
 tmb_pk_all   <- tmb(maf_pk_full,   captureSize = 38)
@@ -709,7 +732,7 @@ cat("Driver burden p-value:",
 
 
 ############################################################
-# 📊 FIGURE 2: TMB MULTI-PANEL
+# FIGURE 2: TMB MULTI-PANEL
 # Panel A: Overall TMB (violin)
 # Panel B: Driver gene mutation burden (boxplot)
 # Panel C: Top mutated gene comparison (bar)
@@ -821,21 +844,19 @@ p_genes <- ggplot(driver_freq,
 # --- Combine all three panels ---
 
 p_fig2 <- ggarrange(
-  ggarrange(p_tmb_overall, p_tmb_driver,
-            ncol = 2, nrow = 1,
-            widths = c(1, 1),
-            common.legend = TRUE,
-            legend = "none"),
+  p_tmb_overall,
+  p_tmb_driver,
   p_genes,
-  nrow = 2,
-  heights = c(1, 1.4),
+  ncol          = 3,
+  nrow          = 1,
+  widths        = c(1, 1, 1.8),
   common.legend = TRUE,
-  legend = "top"
+  legend        = "top"
 )
 
 ggsave(
-  file.path(output_dir, "Fig2_TMB_Driver_Genes_Panel.pdf"),
+  file.path(output_dir, "Fig2_TMB_Driver_Combined.pdf"),
   p_fig2,
-  width  = 12,
-  height = 14
+  width  = 16,
+  height = 6
 )
