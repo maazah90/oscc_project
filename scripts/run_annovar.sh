@@ -9,10 +9,10 @@ set -euo pipefail
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PROJECT_DIR=$(dirname "$SCRIPT_DIR")
 
-AVINPUT_DIR="$PROJECT_DIR/annovar/avinput_tumour"
+AVINPUT_DIR="$PROJECT_DIR/annovar/avinput_indian_cohort"
 HUMANDB="$PROJECT_DIR/annovar/humandb"
-OUTPUT_DIR="$PROJECT_DIR/annovar_detailed"
-LOGS="$PROJECT_DIR/annovar/logs_detailed"
+OUTPUT_DIR="$PROJECT_DIR/annovar_indian-cohort"
+LOGS="$PROJECT_DIR/annovar/logs_indian_cohort"
 
 mkdir -p "$OUTPUT_DIR" "$LOGS"
 
