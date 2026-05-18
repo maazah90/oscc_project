@@ -9,9 +9,9 @@ set -euo pipefail
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 PROJECT_DIR=$(dirname "$SCRIPT_DIR")
 
-VCF_DIR="$PROJECT_DIR/results/pass_vcfs_indian"
+VCF_DIR="$PROJECT_DIR/results/pass_vcfs_indian_cohort"
 ANNOVAR_BIN="$PROJECT_DIR/annovar"
-OUT_DIR="$PROJECT_DIR/annovar/avinput_indian"
+OUT_DIR="$PROJECT_DIR/annovar/avinput_indian_cohort"
 LOGS="$OUT_DIR/logs"
 
 mkdir -p "$OUT_DIR" "$LOGS"
@@ -24,7 +24,7 @@ for vcf in "$VCF_DIR"/*.pass.vcf.gz; do
 
     [[ -e "$vcf" ]] || { echo "❌ No VCF files found"; break; }
 
-    sample=$(basename "$vcf" .pass.vcf.gz)
+    sample=$(basename "$vcf".pass.vcf.gz)
     avinput="$OUT_DIR/${sample}.avinput"
 
     echo "======================================"
