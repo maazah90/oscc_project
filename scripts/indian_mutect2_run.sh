@@ -27,7 +27,7 @@ mkdir -p "$LOGS"
 # SAMPLE LIST & BATCH SETUP
 ################################
 
-SAMPLES=($(cat "$PROJECT_DIR/indian_srrs_clean.txt"))
+SAMPLES=($(cat "$PROJECT_DIR/scripts/indian_srrs_clean.txt"))
 TOTAL=${#SAMPLES[@]}
 BATCH=2   # 2 samples in parallel
 
