@@ -27,9 +27,8 @@
 ############################################################
 # LIBRARIES
 ############################################################
-
+library(here)
 library(data.table)
-library(dplyr)
 library(stringr)
 library(maftools)
 library(ggplot2)
@@ -39,6 +38,7 @@ library(tidyr)
 library(uwot)
 library(patchwork)
 library(TCGAbiolinks)
+library(dplyr)
 
 output_dir <- "FIGURES"
 dir.create(output_dir, showWarnings = FALSE)
@@ -191,6 +191,7 @@ files <- list.files("annovar_detailed",
                     full.names = TRUE)
 
 maf_df <- dplyr::bind_rows(lapply(files, convert_annovar_to_maf)) %>%
+  as.data.frame() %>%                    # ✅ add this line
   dplyr::filter(!is.na(Hugo_Symbol),
                 Hugo_Symbol != "NA",
                 Hugo_Symbol != "")
@@ -230,7 +231,7 @@ print(getGeneSummary(maf_pk_full)[1:15, ])
 ############################################################
 # TCGA — LOAD, FILTER, CLEAN
 ############################################################
-
+options(timeout = 300)  # 5 minutes
 tcga <- tcgaLoad("HNSC", source = "MC3")
 
 oral_sites <- c(
@@ -860,3 +861,149 @@ ggsave(
   width  = 16,
   height = 6
 )
+
+############################################################
+# PATHWAY-LEVEL FISHER'S EXACT TEST
+# Pakistani (South Asian) vs TCGA-European
+############################################################
+
+# Sample sizes
+n_pak  <- length(unique(maf_pk@data$Tumor_Sample_Barcode))   # 29
+n_tcga <- length(unique(tcga_eur@data$Tumor_Sample_Barcode)) # 265
+
+# Define pathways — must match your existing pathway gene sets
+pathway_list <- list(
+  DDR  = ddr_genes,
+  PI3K = pi3k_genes,
+  RAS  = ras_genes,
+  WNT  = wnt_genes
+)
+
+# Count mutated samples per pathway per cohort
+# A sample counts once per pathway regardless of how many genes in that pathway it hits
+count_pathway_samples <- function(maf_data, pathway_genes){
+  maf_data %>%
+    as.data.frame() %>%
+    dplyr::filter(Hugo_Symbol %in% pathway_genes) %>%
+    dplyr::summarise(n = dplyr::n_distinct(Tumor_Sample_Barcode)) %>%
+    dplyr::pull(n)
+}
+
+# Build results table
+pathway_fisher <- lapply(names(pathway_list), function(pw){
+  
+  genes <- pathway_list[[pw]]
+  
+  n_mut_pak  <- count_pathway_samples(maf_pk@data,  genes)
+  n_mut_tcga <- count_pathway_samples(tcga_eur@data, genes)
+  
+  pct_pak  <- round(n_mut_pak  / n_pak  * 100, 1)
+  pct_tcga <- round(n_mut_tcga / n_tcga * 100, 1)
+  
+  # 2x2 contingency matrix
+  # rows: mutated / not mutated
+  # cols: Pakistani / TCGA
+  mat <- matrix(
+    c(n_mut_pak,  n_pak  - n_mut_pak,
+      n_mut_tcga, n_tcga - n_mut_tcga),
+    nrow = 2,
+    dimnames = list(
+      c("Mutated", "Not mutated"),
+      c("Pakistani", "TCGA_EUR")
+    )
+  )
+  
+  ft <- fisher.test(mat, alternative = "two.sided")
+  
+  data.frame(
+    Pathway       = pw,
+    Pakistani_n   = n_mut_pak,
+    Pakistani_pct = pct_pak,
+    TCGA_n        = n_mut_tcga,
+    TCGA_pct      = pct_tcga,
+    OR            = round(ft$estimate, 3),
+    p.value       = ft$p.value,
+    stringsAsFactors = FALSE
+  )
+})
+
+pathway_fisher_df <- dplyr::bind_rows(pathway_fisher) %>%
+  dplyr::mutate(FDR = p.adjust(p.value, method = "BH")) %>%
+  dplyr::arrange(p.value)
+
+# Print results
+cat("\n=== PATHWAY-LEVEL FISHER'S EXACT TEST ===\n")
+print(pathway_fisher_df)
+
+# Save
+write.table(pathway_fisher_df,
+            file.path(output_dir, "Table_Pathway_Fisher.tsv"),
+            sep = "\t", row.names = FALSE)
+
+############################################################
+# ENHANCED PATHWAY PLOT WITH PROPORTIONS + SIGNIFICANCE
+############################################################
+
+# Build plot data with percentages
+pathway_plot_df <- pathway_fisher_df %>%
+  tidyr::pivot_longer(
+    cols      = c(Pakistani_pct, TCGA_pct),
+    names_to  = "Cohort",
+    values_to = "Percentage"
+  ) %>%
+  dplyr::mutate(
+    Cohort = ifelse(Cohort == "Pakistani_pct", "Pakistani", "TCGA_EUR"),
+    # significance label for annotation
+    sig_label = dplyr::case_when(
+      FDR < 0.001 ~ "***",
+      FDR < 0.01  ~ "**",
+      FDR < 0.05  ~ "*",
+      TRUE        ~ "ns"
+    )
+  )
+
+# significance annotation positions (top of tallest bar per pathway)
+sig_df <- pathway_fisher_df %>%
+  dplyr::mutate(
+    y_pos = pmax(Pakistani_pct, TCGA_pct) + 3,
+    sig_label = dplyr::case_when(
+      FDR < 0.001 ~ "***",
+      FDR < 0.01  ~ "**",
+      FDR < 0.05  ~ "*",
+      TRUE        ~ "ns"
+    )
+  )
+
+p_pathway <- ggplot(pathway_plot_df,
+                    aes(x = Pathway, y = Percentage, fill = Cohort)) +
+  geom_bar(stat = "identity",
+           position = position_dodge(width = 0.75),
+           width = 0.7) +
+  geom_text(data = sig_df,
+            aes(x = Pathway, y = y_pos, label = sig_label),
+            inherit.aes = FALSE,
+            size = 5, fontface = "bold") +
+  scale_fill_manual(values = palette_cohort) +
+  theme_pub() +
+  labs(
+    title = "Pathway-Level Mutation Burden",
+    subtitle = "Proportion of samples with \u2265 1 mutation in pathway",
+    x = NULL,
+    y = "Mutated Samples (%)"
+  )
+
+ggsave(file.path(output_dir, "Fig_Pathway_Fisher.pdf"),
+       p_pathway, width = 7, height = 5)
+
+# Print proportions clearly for manuscript text
+cat("\n=== PROPORTIONS FOR MANUSCRIPT ===\n")
+for(i in 1:nrow(pathway_fisher_df)){
+  cat(sprintf("%s: Pakistani %d/%d (%.1f%%) vs TCGA %d/%d (%.1f%%) | OR=%.2f | FDR=%.4f\n",
+              pathway_fisher_df$Pathway[i],
+              pathway_fisher_df$Pakistani_n[i], n_pak,
+              pathway_fisher_df$Pakistani_pct[i],
+              pathway_fisher_df$TCGA_n[i], n_tcga,
+              pathway_fisher_df$TCGA_pct[i],
+              pathway_fisher_df$OR[i],
+              pathway_fisher_df$FDR[i]))
+}

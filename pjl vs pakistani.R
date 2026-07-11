@@ -13,7 +13,7 @@ library(data.table)
 # 🧬 INPUTS
 ############################################################
 
-output_dir <- "figures"
+output_dir <- "FIGURES"
 dir.create(output_dir, showWarnings = FALSE)
 
 # Pakistani tumor MAF already exists in your pipeline
@@ -201,7 +201,7 @@ print(p2)
 ############################################################
 
 ggsave(
-  filename = "figures/driver_comparison_Pakistan_vs_PJL.png",
+  filename = "FIGURES/driver_comparison_Pakistan_vs_PJL.png",
   plot = p1,
   width = 7,
   height = 5,
@@ -209,7 +209,7 @@ ggsave(
 )
 
 ggsave(
-  filename = "figures/driver_comparison_Pakistan_vs_PJL.pdf",
+  filename = "FIGURES/driver_comparison_Pakistan_vs_PJL.pdf",
   plot = p1,
   width = 7,
   height = 5
@@ -220,7 +220,7 @@ ggsave(
 ############################################################
 
 ggsave(
-  filename = "figures/pathway_comparison_Pakistan_vs_PJL.png",
+  filename = "FIGURES/pathway_comparison_Pakistan_vs_PJL.png",
   plot = p2,
   width = 7,
   height = 5,
@@ -228,7 +228,7 @@ ggsave(
 )
 
 ggsave(
-  filename = "figures/pathway_comparison_Pakistan_vs_PJL.pdf",
+  filename = "FIGURES/pathway_comparison_Pakistan_vs_PJL.pdf",
   plot = p2,
   width = 7,
   height = 5
@@ -285,10 +285,10 @@ p6 <- ggplot(path_compare_prop,
     y = "Proportion of driver genes"
   )
 
-ggsave("figures/log_driver_comparison.png", p3, dpi = 300, width = 7, height = 5)
-ggsave("figures/correlation_driver.png", p4, dpi = 300, width = 7, height = 5)
-ggsave("figures/top_genes_comparison.png", p5, dpi = 300, width = 8, height = 6)
-ggsave("figures/pathway_proportions.png", p6, dpi = 300, width = 7, height = 5)
+ggsave("FIGURES/log_driver_comparison.png", p3, dpi = 300, width = 7, height = 5)
+ggsave("FIGURES/correlation_driver.png", p4, dpi = 300, width = 7, height = 5)
+ggsave("FIGURES/top_genes_comparison.png", p5, dpi = 300, width = 8, height = 6)
+ggsave("FIGURES/pathway_proportions.png", p6, dpi = 300, width = 7, height = 5)
 
 
 ############################################################
@@ -513,7 +513,7 @@ fig1 <- ggplot() +
        x = "",
        y = "Number of samples")
 
-ggsave("figures/fig1_cohort_size.png", fig1)
+ggsave("FIGURES/fig1_cohort_size.png", fig1)
 
 library(VennDiagram)
 
@@ -530,7 +530,7 @@ venn.plot <- VennDiagram::draw.pairwise.venn(
   cex = 1.5
 )
 
-png("figures/fig2_venn.png")
+png("FIGURES/fig2_venn.png")
 grid::grid.draw(venn.plot)
 dev.off()
 
@@ -594,7 +594,7 @@ fig3 <- ggplot(path_df,
   theme_classic() +
   labs(title = "Pathway Enrichment (Odds Ratio)")
 
-ggsave("figures/fig3_pathway_OR.png", fig3)
+ggsave("FIGURES/fig3_pathway_OR.png", fig3)
 
 
 driver_table <- driver_compare %>%
@@ -611,7 +611,7 @@ fig4 <- ggplot(driver_table,
        x = "Driver genes",
        y = "log2(OR Pakistan vs PJL)")
 
-ggsave("figures/fig4_gene_OR.png", fig4)
+ggsave("FIGURES/fig4_gene_OR.png", fig4)
 
 
 ############################################################
@@ -649,7 +649,7 @@ head(driver_table, 20)
 
 write.csv(
   driver_table,
-  "figures/driver_enrichment_table.csv",
+  "FIGURES/driver_enrichment_table.csv",
   row.names = FALSE
 )
 
