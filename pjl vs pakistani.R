@@ -1,29 +1,19 @@
 ############################################################
 # 📦 LIBRARIES
 ############################################################
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager", lib = '/media/maazah/Expansion/R_libs')
-
-BiocManager::install("biomaRt", lib = '/media/maazah/Expansion/R_libs')
-BiocManager::install("GenomicRanges", lib = '/media/maazah/Expansion/R_libs')
-
 library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(GenomicRanges)
 library(biomaRt)
+library(vcfR)
+library(data.table)
 
 ############################################################
 # 🧬 INPUTS
 ############################################################
 
-library(vcfR)
-library(dplyr)
-library(data.table)
-library(biomaRt)
-library(ggplot2)
-
-output_dir <- "FIGURES_new"
+output_dir <- "figures"
 dir.create(output_dir, showWarnings = FALSE)
 
 # Pakistani tumor MAF already exists in your pipeline
@@ -211,7 +201,7 @@ print(p2)
 ############################################################
 
 ggsave(
-  filename = "driver_comparison_Pakistan_vs_PJL.png",
+  filename = "figures/driver_comparison_Pakistan_vs_PJL.png",
   plot = p1,
   width = 7,
   height = 5,
@@ -300,16 +290,6 @@ ggsave("figures/correlation_driver.png", p4, dpi = 300, width = 7, height = 5)
 ggsave("figures/top_genes_comparison.png", p5, dpi = 300, width = 8, height = 6)
 ggsave("figures/pathway_proportions.png", p6, dpi = 300, width = 7, height = 5)
 
-
-
-
-
-############################################################
-# 📦 LOAD PACKAGES
-############################################################
-library(dplyr)
-library(ggplot2)
-library(tidyr)
 
 ############################################################
 # 🧬 EXPECTED INPUT
@@ -434,14 +414,6 @@ print(p1)
 print(p2)
 print(p3)
 
-
-############################################################
-# PACKAGES
-############################################################
-library(dplyr)
-library(tidyr)
-library(ggplot2)
-
 ############################################################
 # OPTIONAL: SAVE FOLDER
 ############################################################
@@ -541,7 +513,7 @@ fig1 <- ggplot() +
        x = "",
        y = "Number of samples")
 
-ggsave("reviewer_figures/fig1_cohort_size.png", fig1)
+ggsave("figures/fig1_cohort_size.png", fig1)
 
 library(VennDiagram)
 
@@ -558,7 +530,7 @@ venn.plot <- VennDiagram::draw.pairwise.venn(
   cex = 1.5
 )
 
-png("reviewer_figures/fig2_venn.png")
+png("figures/fig2_venn.png")
 grid::grid.draw(venn.plot)
 dev.off()
 
@@ -622,7 +594,7 @@ fig3 <- ggplot(path_df,
   theme_classic() +
   labs(title = "Pathway Enrichment (Odds Ratio)")
 
-ggsave("reviewer_figures/fig3_pathway_OR.png", fig3)
+ggsave("figures/fig3_pathway_OR.png", fig3)
 
 
 driver_table <- driver_compare %>%
@@ -639,7 +611,7 @@ fig4 <- ggplot(driver_table,
        x = "Driver genes",
        y = "log2(OR Pakistan vs PJL)")
 
-ggsave("reviewer_figures/fig4_gene_OR.png", fig4)
+ggsave("figures/fig4_gene_OR.png", fig4)
 
 
 ############################################################
@@ -677,12 +649,9 @@ head(driver_table, 20)
 
 write.csv(
   driver_table,
-  "reviewer_figures/driver_enrichment_table.csv",
+  "figures/driver_enrichment_table.csv",
   row.names = FALSE
 )
-
-library(ggplot2)
-library(dplyr)
 
 plot_df <- driver_table %>%
   arrange(log2FC) %>%
